@@ -1,10 +1,10 @@
 #include "sdm18.h"
 #include "mbed.h"
 
-sdm18::sdm18(BufferedSerial &sensor) : _sensor(sensor){
-
+sdm18::sdm18(BufferedSerial &sensor,CAN &can) : _sensor(sensor),_can(can){
+    _can.frequency(1000000); // CANのビットレートを指定
 }
-
+//CRC16を計算する関数、アルゴリズムはよくわかりませんでした
 uint16_t sdm18::calculate_crc16(char *buf, int len)
 {
     uint16_t crc = 0xFFFF;
@@ -29,20 +29,21 @@ uint16_t sdm18::calculate_crc16(char *buf, int len)
 	}
     return crc;
 }
-
+//スキャンを開始する関数、しっかり開始できたかどうかを返す
 bool sdm18::startscan(){
     char cmd_start[9]={Packet_heade,Device_number,Device_type,Command_type_start,Reserved_bit,Data_length,Data_length2,CheckSum_start,CheckSum_start2};
     _sensor.write(cmd_start, sizeof(cmd_start));
     _sensor.read(scan_recv_start, 23);
     crc_result=calculate_crc16(scan_recv_start,21);
     checksum=(scan_recv_start[21]<<8)+scan_recv_start[22];
+    
     if(checksum==crc_result&&checksum!=65535){
         return true;
     }else{
         return false;
     }
 }
-
+//スキャンを終了する関数、しっかり終了できたかどうかを返す
 bool sdm18::stopscan(){
     char cmd_stop[9]={Packet_heade,Device_number,Device_type,Command_type_stop,Reserved_bit,Data_length,Data_length2,CheckSum_stop,CheckSum_stop2};
     _sensor.write(cmd_stop, sizeof(cmd_stop));
@@ -55,7 +56,7 @@ bool sdm18::stopscan(){
         return false;
     }
 }
-
+//スキャン中の値を取得する関数、しっかり正しい値がとれたかどうかを返す
 bool sdm18::getdata(){
     if(_sensor.readable())
     {
@@ -70,11 +71,6 @@ bool sdm18::getdata(){
             printf("%d\r\n",static_cast<int>(scan_recv_start[13]) + (static_cast<int>(scan_recv_start[14]) << 8));
             checksum=(scan_recv_start[21]<<8)+scan_recv_start[22];
             crc_result = calculate_crc16(scan_recv_start,21);
-            //printf("CRC-16: 0x%04X\n", sum);
-            //printf("%d\r\n",result);
-            //led = !led; // LEDを点滅させる
-            //CANMessage msg(0x123,scan_recv,23); // ID: 0x123, データ: "Test", データ長: 4バイ
-            //can1.write(msg);
         }
     }
     if(checksum==crc_result&&checksum!=65535)
@@ -84,7 +80,7 @@ bool sdm18::getdata(){
         return false;
     }
 }
-
+//ボードレートをしていする関数、しっかり動作したかを返す
 bool sdm18::setbaudrate(char BaudRate)
 {
     char setbaudrate[10]={Packet_heade,Device_number,Device_type,Command_type_setbaudrate,Reserved_bit,Data_length,Data_length_setbaudrate,BaudRate,CRC_setbaudrate,CRC_setbaudrate2};
@@ -97,4 +93,11 @@ bool sdm18::setbaudrate(char BaudRate)
     }else{
         return false;
     }
+}
+//取得した値をcan通信でおくる関数
+void sdm18::sdm18_send() {//メインマイコンに距離のデータを送信するためのプログラム  
+        _canMessage.len = 2;
+        _canMessage.data[0] = scan_recv_start[13];
+        _canMessage.data[1] = scan_recv_start[14];
+        _can.write(_canMessage);
 }
