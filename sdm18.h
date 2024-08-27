@@ -24,32 +24,26 @@
     const int CRC_setbaudrate=0xBD;
     const int CRC_setbaudrate2=0x3F;
 
+//上記詳細はデータシートで
+
 class sdm18{
 public:
-    //sdm18(CAN &can,bool motor_type,int motor_num);
-    //int sdm18_send(int* moter);
-    //void sdm18_read(CANMessage &msg, short *rotation,short *speed);
-    //void can_read();
-    //float pid(float T,short rpm_now, short set_speed,float *delta_rpm_pre,float *ie,float KP=25,float KI=10, float KD=0);
-    //void spd_control(int* set_speed,int* motor);
-
-    sdm18(BufferedSerial &sensor);
+    sdm18(BufferedSerial &sensor,CAN &can);
     bool setbaudrate(char baudrate);
     uint16_t calculate_crc16(char *buf, int len);
-    bool getdata();
-    bool startscan();
-    bool stopscan();  
+    bool getdata();//値を取得する関数、正しくとれていたらtrue
+    bool startscan();//スキャンを開始する関数、正しくとれていたらtrue
+    bool stopscan();//スキャンを終了する関数、正しくとれてたらtrue
+    void sdm18_send();//canを送る
 private:
-    //uint16_t calculate_crc16;
-    //HardwareSerial &_sensor_serial;
-    //CANMessage _canMessage,_canMessage2,_msg;
-    //CAN &_can;
+    CANMessage _canMessage;
     BufferedSerial &_sensor;
-    char scan_recv_start[23];
-    char scan_recv_stop[10];
-    char scan_recv_setbaudrate[10];
-    uint16_t crc_result;
-    uint16_t checksum;
-
+    CAN &_can;
+    char scan_recv_start[23];//センサから出力される値(始めたとき~動作時)
+    char scan_recv_stop[10];//センサから出力される値(動作終了時)
+    char scan_recv_setbaudrate[10];//センサから出力される値(ボードレート指定時)
+    uint16_t crc_result;//実際にセンサが動作した時の合計値(理論値てきな)
+    uint16_t checksum;//しっかりとセンサが正しい動作をしたかを確かめる変数
+    int _a;
 };
 #endif
